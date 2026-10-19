@@ -938,11 +938,7 @@ const Management = {
           : `<span class="text-muted">${Utils.escapeHtml(r.period.name)}</span> <span class="alt-tag">alt</span>`;
         const teacher = Utils.escapeHtml(e?.teacher?.name || '—');
         const subject = Utils.escapeHtml(e?.subject?.name || '—');
-        const combo = `
-          <div class="scheme-combo urdu">
-            <div class="scheme-teacher">${teacher}</div>
-            <div class="scheme-subject">${subject}${isDual && idx > 0 ? ' <span class="alt-tag">alt</span>' : ''}</div>
-          </div>`;
+        const combo = `<div class="scheme-combo urdu"><span class="scheme-teacher">${teacher}</span><span class="scheme-sep"> · </span><span class="scheme-subject">${subject}</span>${isDual && idx > 0 ? ' <span class="alt-tag">alt</span>' : ''}</div>`;
         return `<tr class="${isDual && idx > 0 ? 'scheme-dual-row' : ''}">
           <td class="scheme-period">${periodLabel}</td>
           <td class="scheme-combo-cell">${combo}</td>
@@ -963,7 +959,7 @@ const Management = {
           <thead>
             <tr>
               <th class="scheme-period">Period</th>
-              <th class="scheme-combo-cell">Teacher / Subject</th>
+              <th class="scheme-combo-cell">Name / Subject</th>
               <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th>
             </tr>
           </thead>
