@@ -130,7 +130,10 @@ const Management = {
                     <td>${Utils.escapeHtml(s.shortName)}</td>
                     <td>${Utils.escapeHtml(s.code)}</td>
                     <td><span class="badge ${s.active?'badge-success':'badge-muted'}">${s.active?'Active':'Off'}</span></td>
-                    <td><button class="btn btn-sm" onclick="Management.showSubjectForm('${s.id}')">Edit</button></td>
+                    <td class="no-print">
+                      <button class="btn btn-sm" onclick="Management.showSubjectForm('${s.id}')">Edit</button>
+                      <button class="btn btn-sm btn-danger" onclick="Management.deleteSubject('${s.id}')">Del</button>
+                    </td>
                   </tr>
                 `).join('')}
               </tbody>
@@ -182,6 +185,24 @@ const Management = {
     App.refresh();
   },
 
+  async deleteSubject(id) {
+    const s = AppState.getSubjectById(id);
+    if (!s) return;
+    const used = (AppState.data.timetable || []).filter(e => e.subjectId === id).length;
+    const msg = used
+      ? `Delete subject "${s.name}"? It is used in ${used} timetable cell(s). Those cells will be cleared.`
+      : `Delete subject "${s.name}"?`;
+    if (!confirm(msg)) return;
+    AppState.data.subjects = (AppState.data.subjects || []).filter(x => x.id !== id);
+    AppState.data.timetable = (AppState.data.timetable || []).filter(e => e.subjectId !== id);
+    (AppState.data.substitutions || []).forEach(sub => {
+      if (sub.subjectId === id) sub.subjectId = '';
+    });
+    await AppState.save('Subject deleted');
+    Utils.toast('Subject deleted', 'success');
+    App.refresh();
+  },
+
   renderClasses() {
     const list = AppState.data.classes;
     return `
@@ -204,7 +225,10 @@ const Management = {
                   <td class="urdu">${Utils.escapeHtml(AppState.getTeacherById(c.classTeacher)?.name || '—')}</td>
                   <td>${Utils.escapeHtml(c.room || '')}</td>
                   <td><span class="badge ${c.active?'badge-success':'badge-muted'}">${c.active?'Active':'Off'}</span></td>
-                  <td><button class="btn btn-sm" onclick="Management.showClassForm('${c.id}')">Edit</button></td>
+                  <td class="no-print">
+                    <button class="btn btn-sm" onclick="Management.showClassForm('${c.id}')">Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="Management.deleteClass('${c.id}')">Del</button>
+                  </td>
                 </tr>
               `).join('')}
             </tbody>
@@ -261,6 +285,22 @@ const Management = {
     else AppState.data.classes.push(entry);
     await AppState.save('Class saved');
     document.getElementById('modal')?.remove();
+    App.refresh();
+  },
+
+  async deleteClass(id) {
+    const c = AppState.getClassById(id);
+    if (!c) return;
+    const used = (AppState.data.timetable || []).filter(e => e.classId === id).length;
+    const msg = used
+      ? `Delete class "${c.name}"? It has ${used} timetable entry(ies). Those will be removed.`
+      : `Delete class "${c.name}"?`;
+    if (!confirm(msg)) return;
+    AppState.data.classes = (AppState.data.classes || []).filter(x => x.id !== id);
+    AppState.data.timetable = (AppState.data.timetable || []).filter(e => e.classId !== id);
+    AppState.data.substitutions = (AppState.data.substitutions || []).filter(s => s.classId !== id);
+    await AppState.save('Class deleted');
+    Utils.toast('Class deleted', 'success');
     App.refresh();
   },
 
@@ -896,31 +936,43 @@ const Management = {
         const periodLabel = idx === 0
           ? Utils.escapeHtml(r.period.name)
           : `<span class="text-muted">${Utils.escapeHtml(r.period.name)}</span> <span class="alt-tag">alt</span>`;
+        const teacher = Utils.escapeHtml(e?.teacher?.name || '—');
+        const subject = Utils.escapeHtml(e?.subject?.name || '—');
+        const combo = `
+          <div class="scheme-combo urdu">
+            <div class="scheme-teacher">${teacher}</div>
+            <div class="scheme-subject">${subject}${isDual && idx > 0 ? ' <span class="alt-tag">alt</span>' : ''}</div>
+          </div>`;
         return `<tr class="${isDual && idx > 0 ? 'scheme-dual-row' : ''}">
-          <td>${periodLabel}</td>
-          <td class="urdu">${Utils.escapeHtml(e?.teacher?.name || '—')}</td>
-          <td class="urdu">${Utils.escapeHtml(e?.subject?.name || '—')}${isDual && idx > 0 ? ' <span class="alt-tag">alt</span>' : ''}</td>
-          <td></td><td></td><td></td><td></td><td></td><td></td>
+          <td class="scheme-period">${periodLabel}</td>
+          <td class="scheme-combo-cell">${combo}</td>
+          <td class="scheme-day"></td>
+          <td class="scheme-day"></td>
+          <td class="scheme-day"></td>
+          <td class="scheme-day"></td>
+          <td class="scheme-day"></td>
+          <td class="scheme-day"></td>
         </tr>`;
       }).join('');
     }).join('');
 
     return `
-      <div class="text-sm text-muted mb-1">Class: ${Utils.escapeHtml(clsName)} · Based on current timetable assignments · Dual subjects shown on a second line</div>
-      <div class="table-wrap">
-        <table class="data-table scheme-table">
+      <div class="text-sm text-muted mb-1">Class: ${Utils.escapeHtml(clsName)} · Teacher + Subject in one column · Dual subjects on second line</div>
+      <div class="table-wrap scheme-grid-wrap">
+        <table class="data-table scheme-table scheme-grid">
           <thead>
             <tr>
-              <th>Period</th><th>Teacher</th><th>Subject</th>
+              <th class="scheme-period">Period</th>
+              <th class="scheme-combo-cell">Teacher / Subject</th>
               <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th>
             </tr>
           </thead>
           <tbody>
-            ${body || '<tr><td colspan="9" class="text-muted">No periods</td></tr>'}
+            ${body || '<tr><td colspan="8" class="text-muted">No periods</td></tr>'}
           </tbody>
         </table>
       </div>
-      <p class="text-xs text-muted mt-1">Topic cells (Mon–Sat) are blank for teachers to fill during the week. Dual / alternative subjects appear on a second line with an <span class="alt-tag">alt</span> tag.</p>
+      <p class="text-xs text-muted mt-1">Mon–Sat cells are blank for weekly topics. Dual subjects show a second line with <span class="alt-tag">alt</span>.</p>
     `;
   },
 
